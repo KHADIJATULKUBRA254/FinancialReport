@@ -1,14 +1,16 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { FinancialData } from "../types";
 
 /**
  * Institutional-grade financial analysis service.
  * Specifically tuned to extract: Total Assets, Total Liabilities, Revenue, and Net Profit.
+ * Using gemini-3-flash-preview to ensure high reliability on the free tier.
  */
 export const analyzeFinancialPDF = async (pdfBase64: string): Promise<FinancialData> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const modelName = 'gemini-3-pro-preview';
+  
+  // Changing to Flash model to avoid 429 quota errors on free tier
+  const modelName = 'gemini-3-flash-preview';
   
   try {
     const response = await ai.models.generateContent({
@@ -69,12 +71,16 @@ export const analyzeFinancialPDF = async (pdfBase64: string): Promise<FinancialD
     
     const parsedData = JSON.parse(text) as FinancialData;
     
-    // Final check to ensure we have valid strings for potential .includes calls
+    // Final check to ensure we have valid data
     if (!parsedData.invest_conclusion) parsedData.invest_conclusion = "NO - DATA INCOMPLETE";
     
     return parsedData;
   } catch (err: any) {
     console.error("AI Service Error:", err);
+    // If we still get a quota error, provide a user-friendly message
+    if (err.message?.includes('429')) {
+      throw new Error("Free tier limit reached. Please wait a minute before trying again.");
+    }
     throw new Error(err.message || "Failed to process document");
   }
 };
